@@ -1,0 +1,89 @@
+---
+title: "Activity Quality"
+author: "Victor Corona"
+date: "March 2017"
+output: html_document
+---
+
+# Background
+
+This analysis aims at identifying variables which may predict the quality of a specific exercise.  The data is from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways, represented by the classe variable.
+
+# Analysis
+
+First, the appropriate R libraries and data need to be loaded.
+
+```{r}
+library(caret)
+library(rpart)
+trainingRaw <- read.csv("./pml-training.csv")
+testing <- read.csv("./pml-testing.csv")
+```
+
+## Cleaning the Data
+
+The training set contains many variables.
+
+```{r}
+dim(trainingRaw)
+```
+
+Getting rid of the variables which don't account for a significant level of the variance observed in the data will produce a more meaningful data set.
+
+```{r}
+nzv <- nearZeroVar(trainingRaw)
+training01 <- trainingRaw[, -nzv]
+```
+
+A review of the new data set shows that the first five variables should have no predictive value. 
+
+```{r}
+head(trainingRaw[,1:5])
+```
+
+There are also some variables that show a large proportion of NA values.  The first five columns of the data will be dropped along with any variables that show a majority of NA values.
+
+```{r}
+training02 <- training01[, -(1:5)]
+dimensions <- dim(training02)
+rows <- dimensions[1]
+training03 <- training02[ , colSums(is.na(training02)) < rows/2]
+dim(training03)
+```
+
+A closer review of the data shows that this conveniently gets rid of all NA values.
+
+```{r}
+dim(training03[ , colSums(is.na(training03)) == 0])
+```
+
+## Building a Model
+
+The data will now be partitioned to allow for cross-validation.  A seed value will also be set to allow for reproducibility.
+
+```{r}
+set.seed(12345)
+inTrain <- createDataPartition(y=training03$classe, p=0.75, list=FALSE)
+training <- training03[inTrain, ]
+validation <- training03[-inTrain, ]
+```
+
+The data is now ready for modelling.  A decision tree may provide additional insight into the variables that have the most predictive value with respect to classe.  The following model uses recursive partitioning.
+
+```{r}
+modFit <- rpart(classe ~ ., method = "class", data = training)
+plot(modFit, main = "Class Tree for Classe")
+text(modFit)
+```
+
+## Prediction on Validation Set
+
+The model may now be used on the validation set to identify the accuracy rate.
+
+```{r}
+predictions <- predict(modFit, validation, type = "class")
+confusionMatrix(predictions, validation$classe)
+```
+
+The confusion matrix identifies an accuracy rate of 79%.
+
